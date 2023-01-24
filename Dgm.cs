@@ -1,21 +1,26 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 
-public class Dgm{
-    
+public class Dgm
+{
 
-    public string DgmFile {get; set;}
-    public string OutputPath {get; set;}
-    public string rasterSize {get; set;}
-    public string targetRasterSize {get; set;}
 
-    public Dgm(){
+    public string DgmFile { get; set; }
+    public string OutputPath { get; set; }
+    public string rasterSize { get; set; }
+    public string targetRasterSize { get; set; }
+
+    public Dgm()
+    {
     }
 
-    public void convertGrid(string dgmFile, string targetRasterSize, string outputPath){
-        
+    public void convertGrid(string dgmFile, string targetRasterSize, string outputPath)
+    {
+
         var stopwatch = new Stopwatch();
         stopwatch.Start();
 
@@ -25,14 +30,17 @@ public class Dgm{
         using (var sw = new StreamWriter(outputPath + @"\reduced_" + targetRasterSize + "m" + ".xyz"))
         {
             string line;
-            while ((line = streamReader.ReadLine()) != null){
+            while ((line = streamReader.ReadLine()) != null)
+            {
                 string[] coords = line.Split(" ");
                 var delimeter = 0;
-                if(coords[0].Split(".").Length > 1){
+                if (coords[0].Split(".").Length > 1)
+                {
                     delimeter = coords[0].Split(".")[1].Length;
                 }
 
-                if(Double.Parse(coords[0]) / Math.Pow(10, delimeter) % Int32.Parse(targetRasterSize) == 0 && Double.Parse(coords[1]) / Math.Pow(10, delimeter) % Int32.Parse(targetRasterSize) == 0 ){
+                if (Double.Parse(coords[0]) / Math.Pow(10, delimeter) % Int32.Parse(targetRasterSize) == 0 && Double.Parse(coords[1]) / Math.Pow(10, delimeter) % Int32.Parse(targetRasterSize) == 0)
+                {
                     sw.WriteLine(line);
                 }
             }
@@ -42,7 +50,9 @@ public class Dgm{
         Console.WriteLine("Elapsed time: " + elapsedTime);
     }
 
-    public void cutoutArea(string dgmFile, int x1, int x2, int y1, int y2, string outputPath){
+    public void cutoutArea(string dgmFile, int x1, int x2, int y1, int y2, string outputPath)
+    {
+
         // go from lower left to upper right
         /*
         |---------x2y2|
@@ -57,21 +67,99 @@ public class Dgm{
         const Int32 BufferSize = 4096;
         using (var fileStream = File.OpenRead(dgmFile))
         using (var streamReader = new StreamReader(fileStream, Encoding.UTF8, true, BufferSize))
-        using (var sw = new StreamWriter(outputPath + @"\cutout"+ ".xyz"))
+        using (var sw = new StreamWriter(outputPath + @"\cutout" + ".xyz"))
         {
             string line;
-             while ((line = streamReader.ReadLine()) != null){
+            while ((line = streamReader.ReadLine()) != null)
+            {
                 string[] coords = line.Split(" ");
 
-                if(Double.Parse(coords[0]) / Math.Pow(10, 2) >= x1 && Double.Parse(coords[0]) / Math.Pow(10, 2) <= x2){
-                    if(Double.Parse(coords[1]) / Math.Pow(10, 2) >= y1 && Double.Parse(coords[1]) / Math.Pow(10, 2) <= y2){
+                if (Double.Parse(coords[0]) / Math.Pow(10, 2) >= x1 && Double.Parse(coords[0]) / Math.Pow(10, 2) <= x2)
+                {
+                    if (Double.Parse(coords[1]) / Math.Pow(10, 2) >= y1 && Double.Parse(coords[1]) / Math.Pow(10, 2) <= y2)
+                    {
                         sw.WriteLine(line);
                     }
                 }
-             }
+            }
         }
         stopwatch.Stop();
         var elapsedTime = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds).ToString("hh\\:mm\\:ss");
         Console.WriteLine("Elapsed time: " + elapsedTime);
+    }
+
+    public void cleanupDGM(string dgmFile, string outputPath)
+    {
+        //1. Step is to split large dgm files into smaller chunks.
+        //2. Step is to sort the dgm file(s). Sort second column (y coord) as numeric, then first column (x coord)
+        //3. Step is to check for duplicate x,y coords and remove them.
+        this.splitDgmFile(dgmFile, outputPath);
+        this.sortXYZ(outputPath);
+    }
+
+    private void sortXYZ(string outputPath){
+        foreach (var file in Directory.GetFiles(outputPath))
+        {
+            Console.WriteLine("Sorting coordinates in file: " + Path.GetFileName(file));
+            var coords = File.ReadAllLines(file);
+            List<string> coordsList = new List<string>(coords);
+            coordsList = coordsList.OrderBy(coord => decimal.Parse(coord.Split(" ")[1]))
+                      .ThenBy(coord => decimal.Parse(coord.Split(" ")[0]))
+                      .ToList();
+                      
+            File.WriteAllLines(outputPath + "\\" + Path.GetFileName(file) , coordsList);
+        }
+    }
+    
+    private void splitDgmFile(string dgmFile, string outputPath)
+    {
+
+        Console.WriteLine("Splitting file into chunks...");
+
+        long fileLength = new FileInfo(dgmFile).Length;
+
+        if (fileLength > 1000000000)
+        {
+
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            //test 500000
+            const long maxLines = 10000000;
+            int outFileNumber = 1;
+            const Int32 BufferSize = 4096;
+
+            using (var fileStream = File.OpenRead(dgmFile))
+            using (var streamReader = new StreamReader(fileStream, Encoding.UTF8, true, BufferSize))
+            {
+                string line;
+                long lineCount = 0;
+                //first file
+                var sw = File.CreateText(outputPath + Path.GetFileNameWithoutExtension(dgmFile) + "_temp" + outFileNumber + ".xyz");
+                while ((line = streamReader.ReadLine()) != null)
+                {
+                    if (lineCount >= maxLines)
+                    {
+                        outFileNumber++;
+                        sw.Flush();
+                        sw.Close();
+                        sw = File.CreateText(outputPath + Path.GetFileNameWithoutExtension(dgmFile) + "_temp" + outFileNumber + ".xyz");
+                        lineCount = 0;
+                    }
+                    sw.WriteLine(line);
+                    lineCount++;
+                }
+                sw.Flush();
+                sw.Close();
+            }
+            stopwatch.Stop();
+            var elapsedTime = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds).ToString("hh\\:mm\\:ss");
+            Console.WriteLine("Created " + outFileNumber + " temporary files...");
+            Console.WriteLine("Elapsed time: " + elapsedTime);
+        }
+        else
+        {
+            Console.WriteLine("Filesize too small. Skipping splitting into chunks..");
+        }
     }
 }
