@@ -8,6 +8,15 @@ using System.Text;
 public class Dgm
 {
 
+    //Refactoring:
+    /*
+    -Dont split dgm file into smaller parts (Removing duplicates is not possible this way)
+    -Keep merge method, but merge raw files first, then sort, then remove duplicates
+    -track dgm file info (Bounds, filesize, number of coords, raster size, info if there were duplicate coords etc.)
+    -Remove split method
+    */
+
+
 
     public string DgmFile { get; set; }
     public string OutputPath { get; set; }
@@ -90,13 +99,75 @@ public class Dgm
 
     public void cleanupDGM(string dgmFile, string outputPath)
     {
+
+        var stopwatch = new Stopwatch();
+        stopwatch.Start();
         //1. Step is to split large dgm files into smaller chunks.
         //2. Step is to sort the dgm file(s). Sort second column (y coord) as numeric, then first column (x coord)
         //3. Step is to check for duplicate x,y coords and remove them.
-        this.splitDgmFile(dgmFile, outputPath);
-        this.sortXYZ(outputPath);
+        //this.splitDgmFile(dgmFile, outputPath);
+        //this.sortXYZ(outputPath);
+        string cleanFile = this.mergeFiles(outputPath);
+
+        this.checkForDuplicates(cleanFile);
+        
+        stopwatch.Stop();
+        var elapsedTime = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds).ToString("hh\\:mm\\:ss");
+        Console.WriteLine("Elapsed time: " + elapsedTime);
     }
 
+    private void checkForDuplicates(string cleanFile){
+        string preY = "";
+        string preX = "";
+
+        const Int32 BufferSize = 4096;
+        using (var fileStream = File.OpenRead(cleanFile))
+        using (var streamReader = new StreamReader(fileStream,Encoding.UTF8, true, BufferSize))
+        using (var sw = new StreamWriter(@"G:\Dev\TestData\split\final.xyz"))
+        {
+            string line;
+            while ((line = streamReader.ReadLine()) != null){
+                string[] coords = line.Split(" ");
+
+                if(preX + preY != coords[0] + coords[1]){
+                    sw.WriteLine(line);
+                }
+                preX = coords[0];
+                preY = coords[1];
+            }
+        } 
+    }
+
+    private string mergeFiles(string outputPath)
+    {
+        string cleanFile = outputPath + @"\clean" + ".xyz";
+
+        if( File.Exists(cleanFile)){
+            File.Delete(cleanFile);
+        }
+
+        const Int32 BufferSize = 4096;
+        foreach (var file in Directory.GetFiles(outputPath))
+        {
+            using (var fileStream = File.OpenRead(file))
+            using (var streamReader = new StreamReader(fileStream, Encoding.UTF8, true, BufferSize))
+            using (var sw = new StreamWriter(cleanFile, append: true))
+            {
+                string line;
+                while ((line = streamReader.ReadLine()) != null)
+                {
+                    sw.WriteLine(line);
+                }
+                fileStream.Flush();
+                fileStream.Close();
+                sw.Flush();
+                sw.Close();
+            }
+        }
+
+        return cleanFile;
+    }
+    //temporary solution. Bit too slow for >1gb files
     private void sortXYZ(string outputPath){
         foreach (var file in Directory.GetFiles(outputPath))
         {
@@ -120,10 +191,6 @@ public class Dgm
 
         if (fileLength > 1000000000)
         {
-
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
-
             //test 500000
             const long maxLines = 10000000;
             int outFileNumber = 1;
@@ -152,13 +219,12 @@ public class Dgm
                 sw.Flush();
                 sw.Close();
             }
-            stopwatch.Stop();
-            var elapsedTime = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds).ToString("hh\\:mm\\:ss");
             Console.WriteLine("Created " + outFileNumber + " temporary files...");
-            Console.WriteLine("Elapsed time: " + elapsedTime);
         }
         else
         {
+            //Copy File as temporary file
+            File.Copy(dgmFile,outputPath + "temp.xyz");
             Console.WriteLine("Filesize too small. Skipping splitting into chunks..");
         }
     }
