@@ -19,19 +19,19 @@ namespace DGMCheckUp
             
             Dgm dgm = new Dgm();
 
+            //Option 1
             if (args.Length == 3 && File.Exists(args[0]) && args[1] != "" &&  Directory.Exists(args[2])){    
                 dgm.convertGrid(args[0], args[1], args[2]);
                 return;
             }
-
+            //Option 2
             if (args.Length == 6 && File.Exists(args[0]) && args[1] != "" && args[2] != "" && args[3] != "" && args[4] != "" && Directory.Exists(args[5])){
                 dgm.cutoutArea(args[0],Int32.Parse(args[1]),Int32.Parse(args[2]),Int32.Parse(args[3]),Int32.Parse(args[4]), args[5]);
             }
-
-            if(args.Length == 2 && File.Exists(args[0]) && Directory.Exists(args[1])){
-                dgm.cleanupDGM(args[0],args[1]);
+            //Option 3
+            if(Directory.Exists(args[0])){
+                dgm.cleanupDGM(args[0]);
             }
-
         }
     }
 }

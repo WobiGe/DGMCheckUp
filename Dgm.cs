@@ -10,10 +10,10 @@ public class Dgm
 
     //Refactoring:
     /*
-    -Dont split dgm file into smaller parts (Removing duplicates is not possible this way)
-    -Keep merge method, but merge raw files first, then sort, then remove duplicates
-    -track dgm file info (Bounds, filesize, number of coords, raster size, info if there were duplicate coords etc.)
-    -Remove split method
+    -Merge all files with linux cat
+    -Sort cat.xyz y first, x second with linux sort
+    -Remove Duplicates if there are any
+    -While removing duplicates, collect data bounds, number of coords, raster size, how many duplicates there are...
     */
 
 
@@ -97,31 +97,29 @@ public class Dgm
         Console.WriteLine("Elapsed time: " + elapsedTime);
     }
 
-    public void cleanupDGM(string dgmFile, string outputPath)
+    public void cleanupDGM(string dgmFilesPath)
     {
 
         var stopwatch = new Stopwatch();
         stopwatch.Start();
-        //1. Step is to split large dgm files into smaller chunks.
-        //2. Step is to sort the dgm file(s). Sort second column (y coord) as numeric, then first column (x coord)
+        //1. Step is to merge raw dgm-files
+        //2. Step is to sort the dgm file. Sort second column (y coord) as numeric, then first column (x coord)
         //3. Step is to check for duplicate x,y coords and remove them.
-        //this.splitDgmFile(dgmFile, outputPath);
-        //this.sortXYZ(outputPath);
-        string cleanFile = this.mergeFiles(outputPath);
-
-        this.checkForDuplicates(cleanFile);
+        string mergedFile = @"G:\Dev\TestData\dgm1_kreis_ddorf_clean\clean.xyz";
+        this.RunCommandWithBash("sort -k2 -n -k1 'G:\\Dev\\TestData\\dgm1_kreis_ddorf_clean\\clean.xyz' -o 'G:\\Dev\\TestData\\dgm1_kreis_ddorf_clean\\sort.xyz'");
+        this.checkForDuplicates(mergedFile);
         
         stopwatch.Stop();
         var elapsedTime = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds).ToString("hh\\:mm\\:ss");
         Console.WriteLine("Elapsed time: " + elapsedTime);
     }
 
-    private void checkForDuplicates(string cleanFile){
+    private void checkForDuplicates(string mergedFile){
         string preY = "";
         string preX = "";
 
         const Int32 BufferSize = 4096;
-        using (var fileStream = File.OpenRead(cleanFile))
+        using (var fileStream = File.OpenRead(mergedFile))
         using (var streamReader = new StreamReader(fileStream,Encoding.UTF8, true, BufferSize))
         using (var sw = new StreamWriter(@"G:\Dev\TestData\split\final.xyz"))
         {
@@ -137,95 +135,22 @@ public class Dgm
             }
         } 
     }
-
-    private string mergeFiles(string outputPath)
+    public string RunCommandWithBash(string command)
     {
-        string cleanFile = outputPath + @"\clean" + ".xyz";
+        //use for cat and sort
+        var psi = new ProcessStartInfo();
+        psi.FileName =  @"G:\Programme\Git\bin\bash.exe";
+        psi.Arguments = $"-c \"{command}\"";
+        psi.RedirectStandardOutput = true;
+        psi.UseShellExecute = false;
+        psi.CreateNoWindow = false;
 
-        if( File.Exists(cleanFile)){
-            File.Delete(cleanFile);
-        }
+        using var process = Process.Start(psi);
 
-        const Int32 BufferSize = 4096;
-        foreach (var file in Directory.GetFiles(outputPath))
-        {
-            using (var fileStream = File.OpenRead(file))
-            using (var streamReader = new StreamReader(fileStream, Encoding.UTF8, true, BufferSize))
-            using (var sw = new StreamWriter(cleanFile, append: true))
-            {
-                string line;
-                while ((line = streamReader.ReadLine()) != null)
-                {
-                    sw.WriteLine(line);
-                }
-                fileStream.Flush();
-                fileStream.Close();
-                sw.Flush();
-                sw.Close();
-            }
-        }
+        process.WaitForExit();
 
-        return cleanFile;
-    }
-    //temporary solution. Bit too slow for >1gb files
-    private void sortXYZ(string outputPath){
-        foreach (var file in Directory.GetFiles(outputPath))
-        {
-            Console.WriteLine("Sorting coordinates in file: " + Path.GetFileName(file));
-            var coords = File.ReadAllLines(file);
-            List<string> coordsList = new List<string>(coords);
-            coordsList = coordsList.OrderBy(coord => decimal.Parse(coord.Split(" ")[1]))
-                      .ThenBy(coord => decimal.Parse(coord.Split(" ")[0]))
-                      .ToList();
-                      
-            File.WriteAllLines(outputPath + "\\" + Path.GetFileName(file) , coordsList);
-        }
-    }
-    
-    private void splitDgmFile(string dgmFile, string outputPath)
-    {
+        var output = process.StandardOutput.ReadToEnd();
 
-        Console.WriteLine("Splitting file into chunks...");
-
-        long fileLength = new FileInfo(dgmFile).Length;
-
-        if (fileLength > 1000000000)
-        {
-            //test 500000
-            const long maxLines = 10000000;
-            int outFileNumber = 1;
-            const Int32 BufferSize = 4096;
-
-            using (var fileStream = File.OpenRead(dgmFile))
-            using (var streamReader = new StreamReader(fileStream, Encoding.UTF8, true, BufferSize))
-            {
-                string line;
-                long lineCount = 0;
-                //first file
-                var sw = File.CreateText(outputPath + Path.GetFileNameWithoutExtension(dgmFile) + "_temp" + outFileNumber + ".xyz");
-                while ((line = streamReader.ReadLine()) != null)
-                {
-                    if (lineCount >= maxLines)
-                    {
-                        outFileNumber++;
-                        sw.Flush();
-                        sw.Close();
-                        sw = File.CreateText(outputPath + Path.GetFileNameWithoutExtension(dgmFile) + "_temp" + outFileNumber + ".xyz");
-                        lineCount = 0;
-                    }
-                    sw.WriteLine(line);
-                    lineCount++;
-                }
-                sw.Flush();
-                sw.Close();
-            }
-            Console.WriteLine("Created " + outFileNumber + " temporary files...");
-        }
-        else
-        {
-            //Copy File as temporary file
-            File.Copy(dgmFile,outputPath + "temp.xyz");
-            Console.WriteLine("Filesize too small. Skipping splitting into chunks..");
-        }
+        return output;
     }
 }
