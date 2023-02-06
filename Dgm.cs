@@ -94,7 +94,7 @@ public class Dgm
         Console.WriteLine("Elapsed time: " + elapsedTime);
     }
 
-    public void cleanupDGM(string dgmFilesPath)
+    public void prepareDGM(string dgmFilesPath, string outputPath)
     {
         //1. Step is to merge raw dgm-files
         //2. Step is to sort the dgm file. Sort second column (y coord) as numeric, then first column (x coord)
@@ -103,34 +103,44 @@ public class Dgm
         var stopwatch = new Stopwatch();
         stopwatch.Start();
 
+        if (!Directory.Exists(outputPath)){
+            Directory.CreateDirectory(outputPath);
+        }
+
+        string dgmFileName = outputPath + "\\dgm_clean.xyz";
         //replace backslash with forward slash for bash operations
         string filePathLnx =  dgmFilesPath.Replace("\\","/");
+        string outPathLnx = outputPath.Replace("\\", "/");
 
         //merge files with cat
         Console.WriteLine("Merging xyz-files...");
-        this.RunCommandWithBash("cat " + filePathLnx + "/*.xyz" + " > " + filePathLnx + "/cat.xyz");
+        this.RunCommandWithBash("cat " + filePathLnx + "/*.xyz" + " > " + outPathLnx + "/cat.xyz");
 
         //sort coordinates. Y first, X second
         Console.WriteLine("Sorting coordinates...");
-        this.RunCommandWithBash("sort -k2 -n -k1 " + filePathLnx + "/cat.xyz -o " + filePathLnx + "/sort.xyz");
+        this.RunCommandWithBash("sort -k2 -n -k1 " + outPathLnx + "/cat.xyz -o " + outPathLnx + "/sort.xyz");
+
+        File.Delete(outputPath + "\\cat.xyz");
 
         //remove duplicates
         Console.WriteLine("Removing duplicates...");
-        this.checkForDuplicates(dgmFilesPath + "\\sort.xyz");
+        this.checkForDuplicates(outputPath + "\\sort.xyz", dgmFileName);
+
+        File.Delete(outputPath + "\\sort.xyz");
         
         stopwatch.Stop();
         var elapsedTime = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds).ToString("hh\\:mm\\:ss");
         Console.WriteLine("Elapsed time: " + elapsedTime);
     }
 
-    public void checkForDuplicates(string mergedFile){
+    public void checkForDuplicates(string dgmFile, string dgmFileName){
         string preY = "";
         string preX = "";
 
         const Int32 BufferSize = 4096;
-        using (var fileStream = File.OpenRead(mergedFile))
+        using (var fileStream = File.OpenRead(dgmFile))
         using (var streamReader = new StreamReader(fileStream,Encoding.UTF8, true, BufferSize))
-        using (var sw = new StreamWriter(@"G:\Dev\TestData\Large\final.xyz"))
+        using (var sw = new StreamWriter(dgmFileName))
         {
             string line;
             while ((line = streamReader.ReadLine()) != null){
