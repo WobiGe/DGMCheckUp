@@ -7,6 +7,15 @@ namespace DGMCheckUp
     {
         static void Main(string[] args)
         {
+
+            string bash = Environment.GetEnvironmentVariable("BASH");
+
+            if (bash == null)
+            {
+                Console.WriteLine("Bash not found! Set environment variable 'BASH' first");
+                return;
+            }
+
             if (args[0] == "h" || args[0] == "help")
             {
                 Console.WriteLine("DGMCheckUp v1.0");

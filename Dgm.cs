@@ -5,17 +5,6 @@ using System.Text;
 
 public class Dgm
 {
-
-    //Refactoring:
-    /*
-    -Merge all files with linux cat
-    -Sort cat.xyz y first, x second with linux sort
-    -Remove Duplicates if there are any
-    -While removing duplicates, collect data bounds, number of coords, raster size, how many duplicates there are...
-    */
-
-
-
     public string DgmFile { get; set; }
     public string OutputPath { get; set; }
     public string RasterSize { get; set; }
