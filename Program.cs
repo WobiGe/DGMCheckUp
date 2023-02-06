@@ -15,7 +15,6 @@ namespace DGMCheckUp
                 Console.WriteLine("2. Increase gridsize of DGM-File" + "\r\n" + "Filepath targetRasterSize Outputpath");
                 Console.WriteLine("3. Cutout specific area of DGM-File" + "\r\n" + "Filepath x1 y1 x2 y2 Outputpath");
                 Console.WriteLine("4. Analyze DGM-File" + "\r\n" + "Filepath");
-                Console.WriteLine("5. Remove duplicates of DGM-File" + "\r\n" + "Filepath r");
             }
 
             Dgm dgm = new Dgm();
@@ -43,12 +42,6 @@ namespace DGMCheckUp
             if (args.Length == 1 && File.Exists(args[0]))
             {
                 //analyze
-                return;
-            }
-            //Option 5
-            if (args.Length == 2 && File.Exists(args[0]) && args[1] == "rd")
-            {
-                dgm.checkForDuplicates(args[0], args[1]);
                 return;
             }
         }
